@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A+ Team Sound Test</title>
+<style>
+  :root{--bg:#121411;--panel:#1a1c16;--ink:#efe6d2;--muted:#a79e87;--red:#e0362a;--good:#8cc46f;--bad:#ff7a59;--line:rgba(239,230,210,.16);color-scheme:dark}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;padding:24px max(16px,env(safe-area-inset-left,0px))}
+  main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  h1{margin:0;font-size:28px}
+  section{background:var(--panel);border:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:10px}
+  h2{margin:0;font-size:18px}
+  button{font:600 15px system-ui,sans-serif;background:var(--red);color:#fff;border:0;padding:10px 16px;cursor:pointer;align-self:flex-start}
+  audio{width:100%}
+  .s{font-family:ui-monospace,Consolas,monospace;font-size:14px;color:var(--muted);white-space:pre-wrap}
+  .ok{color:var(--good)} .no{color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Sound test</h1>
+  <p>Try each test in order and note which ones you can hear.</p>
+
+  <section>
+    <h2>Test 1: plain audio player</h2>
+    <audio id="el" controls preload="auto" src="theme.mp3"></audio>
+    <div class="s" id="s1">Press play on the player above.</div>
+  </section>
+
+  <section>
+    <h2>Test 2: short beep (Web Audio)</h2>
+    <button id="b2" type="button">Play beep</button>
+    <div class="s" id="s2">Not run yet.</div>
+  </section>
+
+  <section>
+    <h2>Test 3: theme through Web Audio (how the game plays it)</h2>
+    <button id="b3" type="button">Play theme</button>
+    <div class="s" id="s3">Not run yet.</div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let ctx=null;
+function getCtx(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); if(ctx.state==='suspended') ctx.resume(); return ctx; }
+const el=$('el');
+el.addEventListener('playing',()=>{$('s1').innerHTML='<span class="ok">Playing.</span> Volume '+el.volume+', muted '+el.muted;});
+el.addEventListener('error',()=>{$('s1').innerHTML='<span class="no">Error loading the file:</span> '+(el.error&&el.error.code);});
+$('b2').onclick=()=>{
+  try{ const c=getCtx(), o=c.createOscillator(), g=c.createGain(), t=c.currentTime;
+    o.frequency.value=660; g.gain.setValueAtTime(0.2,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.6);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t+0.62);
+    $('s2').innerHTML='<span class="ok">Beep sent.</span> Audio state: '+c.state+', sample rate '+c.sampleRate;
+  }catch(e){ $('s2').innerHTML='<span class="no">Failed:</span> '+e; }
+};
+let src=null;
+$('b3').onclick=async()=>{
+  const out=$('s3');
+  try{ const c=getCtx(); out.textContent='Loading theme.mp3…';
+    const r=await fetch('theme.mp3'); out.textContent='Downloaded ('+r.status+'). Decoding…';
+    const buf=await c.decodeAudioData(await r.arrayBuffer());
+    if(src) try{src.stop();}catch(e){}
+    src=c.createBufferSource(); src.buffer=buf; const g=c.createGain(); g.gain.value=0.85; src.connect(g).connect(c.destination); src.start();
+    out.innerHTML='<span class="ok">Playing.</span> '+buf.duration.toFixed(1)+' s long. Audio state: '+c.state;
+    setTimeout(()=>{ out.innerHTML+='\nAfter 2 s: audio clock at '+c.currentTime.toFixed(1)+' s, state '+c.state; },2000);
+  }catch(e){ out.innerHTML='<span class="no">Failed:</span> '+e; }
+};
+</script>
+</body>
+</html>
